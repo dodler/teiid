@@ -40,6 +40,7 @@ connect
 /subsystem=teiid/transport=jdbc:add(protocol=teiid, socket-binding=teiid-jdbc)
 /subsystem=teiid/transport=odbc:add(protocol=pg, socket-binding=teiid-odbc, ssl-mode=disabled) 
 
+/subsystem=teiid/translator=orientdb:add(moule=org.jboss.teiid.translator.jdbc)
 /subsystem=teiid/translator=jdbc-simple:add(module=org.jboss.teiid.translator.jdbc)
 /subsystem=teiid/translator=jdbc-ansi:add(module=org.jboss.teiid.translator.jdbc)
 /subsystem=teiid/translator=access:add(module=org.jboss.teiid.translator.jdbc)
