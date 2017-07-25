@@ -2,10 +2,7 @@ package org.teiid.translator.jdbc.orientdb;
 
 import org.teiid.GeometryInputSource;
 import org.teiid.core.types.BinaryType;
-import org.teiid.language.AggregateFunction;
-import org.teiid.language.Expression;
-import org.teiid.language.Function;
-import org.teiid.language.LanguageObject;
+import org.teiid.language.*;
 import org.teiid.logging.LogConstants;
 import org.teiid.logging.LogManager;
 import org.teiid.translator.ExecutionContext;
@@ -17,10 +14,7 @@ import org.teiid.translator.jdbc.Version;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -36,11 +30,19 @@ import static org.teiid.translator.jdbc.orientdb.OrientDBExecutionFactory.ODBNat
 @Translator(name = "orientdb", description = "Translator for OrientDB database")
 public class OrientDBExecutionFactory extends JDBCExecutionFactory {
 
-    public static final Version VERSION_0_9_25 = Version.getVersion("0.9.25");
+    /**
+     * currently orientdb doesn't support version acquiring
+     */
 
-    public OrientDBExecutionFactory(){
+    public static final Version VERSION_0_9_25 = Version.getVersion("0.9.25");
+    public static final Version VERSION_0_9_1 = Version.getVersion("0.9.1");
+    /**
+     * since that supports arith in eval expression
+     */
+    public static final Version VERSION_1_RC7 = Version.getVersion("1.RC7");
+
+    public OrientDBExecutionFactory() {
         setUseBindVariables(false);
-        setDatabaseTimeZone("???"); // fixme
         setUseCommentsInSourceQuery(true);
 
     }
@@ -52,20 +54,20 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
 
         private final String type;
 
-        ODBNativeTypes(String type){
+        ODBNativeTypes(String type) {
             this.type = type;
         }
 
-        public String toString(){
+        public String toString() {
             return type;
         }
 
-        public static String toNative(ODBNativeTypes nativeType){
+        public static String toNative(ODBNativeTypes nativeType) {
             return nativeType.toString();
         }
     }
 
-    public void start() throws TranslatorException{
+    public void start() throws TranslatorException {
         super.start();
 
         ConvertModifier convertModifier = new ConvertModifier();
@@ -137,104 +139,106 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
     }
 
     @Override
-    public List<String> getSupportedFunctions(){
+    public List<String> getSupportedFunctions() {
         return Collections.emptyList();
     }
 
     @Override
     public void initCapabilities(Connection connection) throws TranslatorException {
         super.initCapabilities(connection);
-        // todo add version retriving
-    }
 
-    @Override // not sure on this
-    public int getTimestampNanoPrecision(){
-        return 0;
     }
 
     /**
      * orientdb supports generic arith operations only in eval function
+     *
      * @return
      */
     @Override
-    public List<String> getDefaultSupportedFunctions(){
+    public List<String> getDefaultSupportedFunctions() {
         return Arrays.asList(new String[]{});
     }
 
     @Override
-    public NullOrder getDefaultNullOrder(){
+    public NullOrder getDefaultNullOrder() {
         return NullOrder.LOW;
     }
 
     @Override
-    public List<?> translate(LanguageObject obj, ExecutionContext context){
+    public List<?> translate(LanguageObject obj, ExecutionContext context) {
+        final List<?> translate = super.translate(obj, context);
         AggregateFunction t = (AggregateFunction) obj;
         LogManager.logDetail(LogConstants.CTX_CONNECTOR, t.getName());
-        return super.translate(obj, context);
+        tryHandleFunction(obj, context);
+        return translate;
     }
 
-    /*
-    started here group by
-    finished here supportsOrCriteria,
+    private List<?> tryHandleFunction(LanguageObject obj, ExecutionContext context) {
+        if (obj.getClass().equals(Function.class)) {
+            final List<?> objects = handleFunction((Function) obj, context);
+        }
+        return null;
+    }
 
-    * */
+    private List<?> handleFunction(Function obj, ExecutionContext context) {
+        LogManager.logDetail(LogConstants.CTX_CONNECTOR, obj.getName());
+        return null;
+    }
 
     /**
      * orientdb performs query, but result is not sorted
+     *
      * @return
      */
     @Override
-    public boolean supportsOrderByUnrelated(){
+    public boolean supportsOrderByUnrelated() {
         return false;
     }
 
     @Override
-    public boolean supportsQuantifiedCompareCriteriaAll(){
+    public boolean supportsQuantifiedCompareCriteriaAll() {
         return false;
     }
 
-    /**
-     * this can be bug actually, because afaik orientdb doesn't support having
-     * @return
-     */
     @Override
-    public boolean supportsScalarSubqueries(){
+    public boolean supportsScalarSubqueries() {
         return true;
     }
 
     @Override
-    public boolean supportsSearchedCaseExpressions(){
+    public boolean supportsSearchedCaseExpressions() {
         return false;
     }
 
     @Override
-    public boolean supportsSelfJoins(){
+    public boolean supportsSelfJoins() {
         return false;
     }
 
     @Override
-    public boolean supportsInlineViews(){
+    public boolean supportsInlineViews() {
         return true;
     }
 
     @Override
-    public boolean supportsQuantifiedCompareCriteriaSome(){
+    public boolean supportsQuantifiedCompareCriteriaSome() {
         return true;
     }
 
     /**
      * todo check about select from multiple tables
+     *
      * @return
      */
     @Override
-    public boolean supportsUnions(){
+    public boolean supportsUnions() {
         return false;
     }
 
     // not sure about bulk and batch updates
 
     @Override
-    public boolean supportsHaving(){
+    public boolean supportsHaving() {
         return false;
     }
 
@@ -244,62 +248,93 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
     // supports boolean true
 
     @Override
-    public Expression translateGeometrySelect(Expression e){
-        return new Function("", Arrays.asList(e), VARBINARY); // here should be
-        // appripriate functino to wkb value
-    }
-
-    @Override
-    public Object retrieveGeometryValue(ResultSet results, int paramIndex) {
-        final byte[] bytes;
-        try {
-            bytes = results.getBytes(paramIndex);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return null;
-        }
-        if (bytes != null) {
-            return new GeometryInputSource() {
-                @Override
-                public InputStream getEwkb() throws Exception {
-                    return new ByteArrayInputStream(bytes);
-                }
-            };
-        }
-        return null;
-        // finish geometry values
-    }
-
-    @Override
-    public String translateLiteralBoolean(Boolean boolVal){
-        if(boolVal.booleanValue()){
+    public String translateLiteralBoolean(Boolean boolVal) {
+        if (boolVal.booleanValue()) {
             return "true";
         }
         return "false";
     }
 
     @Override
-    public String translateLiteralDate(java.sql.Date date){
+    public String translateLiteralDate(java.sql.Date date) {
         // todo introduce version comparison
         return "date('" + date.toString() + "').format('YYYY-MM-dd')";
     }
 
+    @Override
     public String translateLiteralTimestamp(Timestamp timestamp) {
         timestamp.setNanos(getTimestampNanoPrecision());
         return "date('" + timestamp.toString() + "')";
     }
 
 
-    public String translateLiteralBinaryType(BinaryType binObj){
+    @Override
+    public String translateLiteralBinaryType(BinaryType binObj) {
         return String.valueOf(binObj.getBytes()); // todo check for that
     }
 
     /**
      * orientdb doesn't support alias
+     *
      * @return
      */
-    public boolean useAsInGroupAlias(){
+    @Override
+    public boolean useAsInGroupAlias() {
         return false;
     }
 
+
+    @Override
+    public boolean usePreparedStatements() {
+        return true;
+    }
+
+    @Override
+    public String getSourceComment(ExecutionContext context, Command command) {
+        return ""; // todo implementme
+    }
+
+    @Override
+    public int getTimestampNanoPrecision() {
+        return 0;
+    }
+
+
+    @Override
+    public ResultSet executeStoredProcedure(CallableStatement statement,
+                                            List<Argument> preparedValues,
+                                            Class<?> returnType) throws SQLException {
+        return null; // // FIXME: 22.07.17
+    }
+
+    @Override
+    public void bindValue(PreparedStatement statement,
+                          Object param,
+                          Class<?> paramType,
+                          int i) throws SQLException {
+        super.bindValue(statement, param, paramType, i); // fixme
+    }
+
+    @Override
+    public boolean useStreamsForLobs() {
+        return true; // check that
+    }
+
+    @Override
+    public Object retrieveValue(ResultSet results, int columnIndex, Class<?> expectedType) throws SQLException {
+        return super.retrieveValue(results, columnIndex, expectedType); // fixme
+    }
+    // found no impls for convertObject and afterInitialConnectionObtained methods
+    // also for obtainedConnection
+
+
+    @Override
+    public boolean useSelectLimit(){
+        return true;
+    }
+
+    @Override
+    public String getHibernateDialectClassName(){
+        return "org.hibernate.dialect.PostgreSQLDialect";
+    }
 }
