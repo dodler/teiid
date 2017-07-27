@@ -1,28 +1,33 @@
 package org.teiid.translator.jdbc.orientdb;
 
-import org.teiid.GeometryInputSource;
 import org.teiid.core.types.BinaryType;
 import org.teiid.language.*;
 import org.teiid.logging.LogConstants;
 import org.teiid.logging.LogManager;
 import org.teiid.translator.ExecutionContext;
+import org.teiid.translator.SourceSystemFunctions;
 import org.teiid.translator.Translator;
 import org.teiid.translator.TranslatorException;
 import org.teiid.translator.jdbc.ConvertModifier;
 import org.teiid.translator.jdbc.JDBCExecutionFactory;
 import org.teiid.translator.jdbc.Version;
+import org.teiid.translator.jdbc.orientdb.modifiers.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.sql.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import static org.teiid.translator.jdbc.FunctionModifier.*;
-import static org.teiid.translator.jdbc.orientdb.OrientDBExecutionFactory.ODBNativeTypes.BINARY;
-import static org.teiid.translator.jdbc.orientdb.OrientDBExecutionFactory.ODBNativeTypes.DATETIME;
-import static org.teiid.translator.jdbc.orientdb.OrientDBExecutionFactory.ODBNativeTypes.toNative;
+import static org.teiid.translator.jdbc.FunctionModifier.BOOLEAN;
+import static org.teiid.translator.jdbc.FunctionModifier.BYTE;
+import static org.teiid.translator.jdbc.FunctionModifier.DATE;
+import static org.teiid.translator.jdbc.FunctionModifier.DOUBLE;
+import static org.teiid.translator.jdbc.FunctionModifier.FLOAT;
+import static org.teiid.translator.jdbc.FunctionModifier.INTEGER;
+import static org.teiid.translator.jdbc.FunctionModifier.LONG;
+import static org.teiid.translator.jdbc.FunctionModifier.SHORT;
+import static org.teiid.translator.jdbc.orientdb.OrientDBExecutionFactory.ODBNativeTypes.*;
 
 /**
  * Created by lyan on 30.05.17.
@@ -69,6 +74,12 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
 
     public void start() throws TranslatorException {
         super.start();
+
+        registerFunctionModifier(SourceSystemFunctions.ADD_OP, new PlusModifier());
+        registerFunctionModifier(SourceSystemFunctions.DIVIDE_OP, new DivModifier());
+        registerFunctionModifier(SourceSystemFunctions.MULTIPLY_OP, new MulModifier());
+        registerFunctionModifier(SourceSystemFunctions.SUBTRACT_OP, new MinusModifier());
+        registerFunctionModifier(SourceSystemFunctions.ABS, new AbsModifier());
 
         ConvertModifier convertModifier = new ConvertModifier();
         convertModifier.addTypeMapping("String", STRING);
@@ -176,13 +187,17 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
     private List<?> tryHandleFunction(LanguageObject obj, ExecutionContext context) {
         if (obj.getClass().equals(Function.class)) {
             final List<?> objects = handleFunction((Function) obj, context);
+            if (objects != null) {
+                return objects;
+            }
         }
         return null;
     }
 
     private List<?> handleFunction(Function obj, ExecutionContext context) {
         LogManager.logDetail(LogConstants.CTX_CONNECTOR, obj.getName());
-        return null;
+        final List<Expression> parameters = obj.getParameters();
+
     }
 
     /**
