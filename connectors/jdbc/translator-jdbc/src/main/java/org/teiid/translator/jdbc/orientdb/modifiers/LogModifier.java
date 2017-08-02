@@ -7,16 +7,17 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * perform natural logarithm calculation
  * Created by lyan on 27.07.17.
  */
-public class LnModifier extends FunctionModifier {
-
+public class LogModifier extends FunctionModifier {
     @Override
     public List<?> translate(Function function) {
-        Double value = Double.parseDouble(function.getParameters().get(0).toString());
         return Arrays.asList(
-                String.valueOf(Math.log(value))
+                Math.log10(
+                        Double.parseDouble(
+                                function.getParameters().get(0).toString()
+                        )
+                )
         );
     }
 }

@@ -8,12 +8,14 @@ import org.teiid.translator.ExecutionContext;
 import org.teiid.translator.SourceSystemFunctions;
 import org.teiid.translator.Translator;
 import org.teiid.translator.TranslatorException;
+import org.teiid.translator.jdbc.AliasModifier;
 import org.teiid.translator.jdbc.ConvertModifier;
 import org.teiid.translator.jdbc.JDBCExecutionFactory;
 import org.teiid.translator.jdbc.Version;
 import org.teiid.translator.jdbc.orientdb.modifiers.*;
 
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +47,17 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
      * since that supports arith in eval expression
      */
     public static final Version VERSION_1_RC7 = Version.getVersion("1.RC7");
+    public static final List<String> SUPPORTED_FUNCTIONS = new ArrayList<>();
+
+    static{
+        SUPPORTED_FUNCTIONS.add(SourceSystemFunctions.ADD_OP);
+        SUPPORTED_FUNCTIONS.add(SourceSystemFunctions.DIVIDE_OP);
+        SUPPORTED_FUNCTIONS.add(SourceSystemFunctions.MULTIPLY_OP);
+        SUPPORTED_FUNCTIONS.add(SourceSystemFunctions.SUBTRACT_OP);
+        SUPPORTED_FUNCTIONS.add(SourceSystemFunctions.ABS);
+        SUPPORTED_FUNCTIONS.add(SourceSystemFunctions.LOG);
+        SUPPORTED_FUNCTIONS.add(SourceSystemFunctions.LOG10);
+    }
 
     public OrientDBExecutionFactory() {
         setUseBindVariables(false);
@@ -79,7 +92,17 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
         registerFunctionModifier(SourceSystemFunctions.DIVIDE_OP, new DivModifier());
         registerFunctionModifier(SourceSystemFunctions.MULTIPLY_OP, new MulModifier());
         registerFunctionModifier(SourceSystemFunctions.SUBTRACT_OP, new MinusModifier());
-        registerFunctionModifier(SourceSystemFunctions.ABS, new AbsModifier());
+        registerFunctionModifier(SourceSystemFunctions.ABS, new AliasModifier("abs"));
+        registerFunctionModifier(SourceSystemFunctions.LOG, new LnModifier());
+        registerFunctionModifier(SourceSystemFunctions.LOG10, new LogModifier());
+
+        registerFunctionModifier(SourceSystemFunctions.BITAND, new BitAndModifier());
+        registerFunctionModifier(SourceSystemFunctions.BITOR, new BitOrModifier());
+        registerFunctionModifier(SourceSystemFunctions.BITXOR, new BitXorModifier());
+        registerFunctionModifier(SourceSystemFunctions.BITNOT, new BitNotModifier());
+
+        registerFunctionModifier(SourceSystemFunctions.UCASE, new UpperModifier());
+
 
         ConvertModifier convertModifier = new ConvertModifier();
         convertModifier.addTypeMapping("String", STRING);
@@ -151,13 +174,12 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
 
     @Override
     public List<String> getSupportedFunctions() {
-        return Collections.emptyList();
+        return SUPPORTED_FUNCTIONS;
     }
 
     @Override
     public void initCapabilities(Connection connection) throws TranslatorException {
         super.initCapabilities(connection);
-
     }
 
     /**
@@ -180,24 +202,7 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
         final List<?> translate = super.translate(obj, context);
         AggregateFunction t = (AggregateFunction) obj;
         LogManager.logDetail(LogConstants.CTX_CONNECTOR, t.getName());
-        tryHandleFunction(obj, context);
         return translate;
-    }
-
-    private List<?> tryHandleFunction(LanguageObject obj, ExecutionContext context) {
-        if (obj.getClass().equals(Function.class)) {
-            final List<?> objects = handleFunction((Function) obj, context);
-            if (objects != null) {
-                return objects;
-            }
-        }
-        return null;
-    }
-
-    private List<?> handleFunction(Function obj, ExecutionContext context) {
-        LogManager.logDetail(LogConstants.CTX_CONNECTOR, obj.getName());
-        final List<Expression> parameters = obj.getParameters();
-
     }
 
     /**

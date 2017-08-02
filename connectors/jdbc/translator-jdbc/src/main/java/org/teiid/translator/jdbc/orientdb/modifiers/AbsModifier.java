@@ -15,7 +15,7 @@ public class AbsModifier extends FunctionModifier {
     public List<?> translate(Function function) {
         List<String> result = new ArrayList<>();
         final List<Expression> parameters = function.getParameters();
-        Double value = Double.parseDouble(parameters.get(0));
+        Double value = Double.parseDouble(parameters.get(0).toString());
         result.add(String.valueOf(Math.abs(value)));
         return result;
     }
