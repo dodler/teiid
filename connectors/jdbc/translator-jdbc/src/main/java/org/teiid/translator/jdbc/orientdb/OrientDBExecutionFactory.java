@@ -1,13 +1,13 @@
 package org.teiid.translator.jdbc.orientdb;
 
 import org.teiid.core.types.BinaryType;
-import org.teiid.language.*;
-import org.teiid.logging.LogConstants;
+import org.teiid.language.Argument;
+import org.teiid.language.Command;
+import org.teiid.language.LanguageObject;
+import org.teiid.language.Select;
 import org.teiid.logging.LogManager;
-import org.teiid.translator.ExecutionContext;
-import org.teiid.translator.SourceSystemFunctions;
-import org.teiid.translator.Translator;
-import org.teiid.translator.TranslatorException;
+import org.teiid.metadata.Table;
+import org.teiid.translator.*;
 import org.teiid.translator.jdbc.AliasModifier;
 import org.teiid.translator.jdbc.ConvertModifier;
 import org.teiid.translator.jdbc.JDBCExecutionFactory;
@@ -17,7 +17,6 @@ import org.teiid.translator.jdbc.orientdb.modifiers.*;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import static org.teiid.translator.jdbc.FunctionModifier.*;
@@ -30,6 +29,8 @@ import static org.teiid.translator.jdbc.FunctionModifier.INTEGER;
 import static org.teiid.translator.jdbc.FunctionModifier.LONG;
 import static org.teiid.translator.jdbc.FunctionModifier.SHORT;
 import static org.teiid.translator.jdbc.orientdb.OrientDBExecutionFactory.ODBNativeTypes.*;
+
+import org.teiid.logging.LogConstants;
 
 /**
  * Created by lyan on 30.05.17.
@@ -173,6 +174,11 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
     }
 
     @Override
+    public MetadataProcessor<Connection> getMetadataProcessor() {
+        return new OrientDBMetadataProcessor();
+    }
+
+    @Override
     public List<String> getSupportedFunctions() {
         return SUPPORTED_FUNCTIONS;
     }
@@ -180,6 +186,26 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
     @Override
     public void initCapabilities(Connection connection) throws TranslatorException {
         super.initCapabilities(connection);
+    }
+
+    @Override
+    public List<?> translate(LanguageObject obj, ExecutionContext context) {
+
+        LogManager.logInfo(LogConstants.CTX_CONNECTOR, String.valueOf(obj));
+
+        if (obj != null) {
+            System.out.println(obj.getClass());
+            System.err.println(obj.getClass());
+            LogManager.logDetail(LogConstants.CTX_CONNECTOR, obj.getClass().toString());
+        }
+
+//        if (obj instanceof Select){
+//            return Arrays.asList("select * from arith;");
+//        }
+
+        LogManager.logInfo(LogConstants.CTX_CONNECTOR, "using super");
+        return super.translate(obj, context);
+//        return Arrays.asList("failed to determine");
     }
 
     /**
@@ -195,14 +221,6 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
     @Override
     public NullOrder getDefaultNullOrder() {
         return NullOrder.LOW;
-    }
-
-    @Override
-    public List<?> translate(LanguageObject obj, ExecutionContext context) {
-        final List<?> translate = super.translate(obj, context);
-        AggregateFunction t = (AggregateFunction) obj;
-        LogManager.logDetail(LogConstants.CTX_CONNECTOR, t.getName());
-        return translate;
     }
 
     /**
