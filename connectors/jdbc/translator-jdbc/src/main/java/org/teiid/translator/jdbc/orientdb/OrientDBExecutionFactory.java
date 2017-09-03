@@ -1,10 +1,7 @@
 package org.teiid.translator.jdbc.orientdb;
 
 import org.teiid.core.types.BinaryType;
-import org.teiid.language.Argument;
-import org.teiid.language.Command;
-import org.teiid.language.LanguageObject;
-import org.teiid.language.Select;
+import org.teiid.language.*;
 import org.teiid.logging.LogManager;
 import org.teiid.metadata.Table;
 import org.teiid.translator.*;
@@ -191,21 +188,49 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
     @Override
     public List<?> translate(LanguageObject obj, ExecutionContext context) {
 
-        LogManager.logInfo(LogConstants.CTX_CONNECTOR, String.valueOf(obj));
+        log(obj.getClass());
 
-        if (obj != null) {
-            System.out.println(obj.getClass());
-            System.err.println(obj.getClass());
-            LogManager.logDetail(LogConstants.CTX_CONNECTOR, obj.getClass().toString());
+        if (obj instanceof Select) {
+            Select select = (Select) obj;
+            List<TableReference> from = select.getFrom();
+
+            NamedTable fromSelect = (NamedTable) from.get(0);
+            fromSelect.setName(fromSelect.getName().split(" ")[0]);
+
+//            select.getDerivedColumns().stream().map(column -> column.set)
+            log(select.getDependentValues());
+            log(select.getDerivedColumns().get(0).getAlias());
+            ColumnReference expression = (ColumnReference) select.getDerivedColumns().get(0).getExpression();
+            NamedTable table = expression.getTable();
+            String name = table.getName();
+            String[] split = name.split(" ");
+            log("split[0]:" + split[0]);
+            table.setName(split[0]);
+            table.setCorrelationName(split[0]);
+            log(table.getMetadataObject());
+            log("table:" + table);
+
+            log("expr class:" + expression.getClass());
+
+            log("exprt:" + expression);
+//            select.getDerivedColumns().stream().map(col -> col.gea)
+
+            LogManager.logInfo(LogConstants.CTX_CONNECTOR, "select:" + String.valueOf(select));
+        }else{
+            LogManager.logInfo(LogConstants.CTX_CONNECTOR, "output:" + String.valueOf(obj));
         }
 
-//        if (obj instanceof Select){
-//            return Arrays.asList("select * from arith;");
-//        }
+        LogManager.logInfo(LogConstants.CTX_CONNECTOR, "ctx:" + context);
 
-        LogManager.logInfo(LogConstants.CTX_CONNECTOR, "using super");
-        return super.translate(obj, context);
-//        return Arrays.asList("failed to determine");
+        List<?> translate = super.translate(obj, context);
+
+        LogManager.logInfo(LogConstants.CTX_CONNECTOR, "translated:" + String.valueOf(translate));
+
+        return translate;
+    }
+
+    private void log(Object any) {
+        LogManager.logInfo(LogConstants.CTX_CONNECTOR, String.valueOf(any));
     }
 
     /**
@@ -255,7 +280,7 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
 
     @Override
     public boolean supportsInlineViews() {
-        return true;
+        return false;
     }
 
     @Override
