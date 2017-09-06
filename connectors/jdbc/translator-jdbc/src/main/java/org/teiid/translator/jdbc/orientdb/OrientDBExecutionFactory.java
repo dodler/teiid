@@ -187,46 +187,62 @@ public class OrientDBExecutionFactory extends JDBCExecutionFactory {
 
     @Override
     public List<?> translate(LanguageObject obj, ExecutionContext context) {
-
-        log(obj.getClass());
-
-        if (obj instanceof Select) {
-            Select select = (Select) obj;
-            List<TableReference> from = select.getFrom();
-
-            NamedTable fromSelect = (NamedTable) from.get(0);
-            fromSelect.setName(fromSelect.getName().split(" ")[0]);
-
-//            select.getDerivedColumns().stream().map(column -> column.set)
-            log(select.getDependentValues());
-            log(select.getDerivedColumns().get(0).getAlias());
-            ColumnReference expression = (ColumnReference) select.getDerivedColumns().get(0).getExpression();
-            NamedTable table = expression.getTable();
-            String name = table.getName();
-            String[] split = name.split(" ");
-            log("split[0]:" + split[0]);
-            table.setName(split[0]);
-            table.setCorrelationName(split[0]);
-            log(table.getMetadataObject());
-            log("table:" + table);
-
-            log("expr class:" + expression.getClass());
-
-            log("exprt:" + expression);
-//            select.getDerivedColumns().stream().map(col -> col.gea)
-
-            LogManager.logInfo(LogConstants.CTX_CONNECTOR, "select:" + String.valueOf(select));
-        }else{
-            LogManager.logInfo(LogConstants.CTX_CONNECTOR, "output:" + String.valueOf(obj));
-        }
-
-        LogManager.logInfo(LogConstants.CTX_CONNECTOR, "ctx:" + context);
-
         List<?> translate = super.translate(obj, context);
+//        LogManager.logInfo(LogConstants.CTX_CONNECTOR, "ctx:" + context);
 
-        LogManager.logInfo(LogConstants.CTX_CONNECTOR, "translated:" + String.valueOf(translate));
-
+        if (obj != null) {
+            log(obj.getClass());
+            if (obj instanceof Select) {
+                handleSelect((Select) obj);
+            }else if (obj instanceof Update){
+                handleUpdate((Update)obj);
+            }else if(obj instanceof Delete){
+                handleDelete((Delete)obj);
+            }
+            log("result:" + obj);
+        }
         return translate;
+    }
+
+    private void handleDelete(Delete delete) {
+        Comparison where = (Comparison) delete.getWhere();
+        if (where != null) {
+            ColumnReference leftExpression = (ColumnReference) where.getLeftExpression();
+            leftExpression.setTable(null);
+            where.setLeftExpression(leftExpression);
+        }
+    }
+
+    private void handleUpdate(Update update) {
+        Comparison where = (Comparison) update.getWhere();
+        if (where != null) {
+            ColumnReference leftExpression = (ColumnReference) where.getLeftExpression();
+            leftExpression.setTable(null);
+            where.setLeftExpression(leftExpression);
+        }
+    }
+
+    private void handleSelect(Select select) {
+        List<TableReference> from = select.getFrom();
+
+        NamedTable fromSelect = (NamedTable) from.get(0);
+
+        fromSelect.setCorrelationName(null);
+        fromSelect.setName(fromSelect.getName().split(" ")[0]);
+
+        List<DerivedColumn> derivedColumns = select.getDerivedColumns();
+        DerivedColumn derivedColumn = derivedColumns.get(0);
+
+        ColumnReference expression = (ColumnReference) derivedColumn.getExpression();
+        NamedTable table = expression.getTable();
+        table.setCorrelationName(null);
+        expression.setTable(null);
+        derivedColumn.setExpression(expression);
+        select.setDerivedColumns(Arrays.asList(derivedColumn));
+
+        if (select.getWhere() != null) {
+            log("select where:" + select.getWhere());
+        }
     }
 
     private void log(Object any) {
